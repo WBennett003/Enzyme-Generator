@@ -31,14 +31,14 @@ class EnzymeGenerator: #TODO: to add wandb loging, saving and loading weights
 
         self.accuracy = Accuracy(task='multiclass', num_classes=self.AA_size).to(self.device)
         
-    def train(self, dataset, EPOCHS, BATCH_SIZE=5, learning_rate=1e-3, log=True, print_n=1 , name='enzyme', load=(True, True), visualiation=True):
+    def train(self, dataset, EPOCHS, BATCH_SIZE=5, learning_rate=1e-3, log=True, print_n=1 , name='enzyme', load=(False, False), visualiation=True):
         
-        data_loader = torch.utils.data.DataLoader(dataset, BATCH_SIZE, shuffle=True)
+        data_loader = torch.utils.data.DataLoader(dataset, BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=0)
 
-        optimizer = torch.optim.Adam(self.denoise.model.parameters())
+        # optimizer = torch.optim.Adam(self.denoise.model.parameters())
 
         optimizer = torch.optim.AdamW(self.denoise.model.parameters())
-        schedular = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=learning_rate, epochs=EPOCHS)
+        schedular = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=learning_rate, epochs=EPOCHS, steps_per_epoch=len(data_loader))
 
         if load[0]:
             self.denoise.model.load_state_dict(torch.load(self.save_dir+name+'model.pt'))
@@ -68,8 +68,8 @@ class EnzymeGenerator: #TODO: to add wandb loging, saving and loading weights
             if epoch % print_n == 0:
                 l = tot_loss / n_batches
                 xt = self.inference(eqx[:, :, None].to(self.device), 2)
-                true_seq = self.aa_tokeniser(AA_seq.detach()[-1].argmax(-1))
-                pred_seq = self.aa_tokeniser(xt.detach()[-1].argmax(-1))
+                true_seq = ''.join(self.aa_tokeniser.stringify(AA_seq.detach()[-1].argmax(-1)))
+                pred_seq = ''.join(self.aa_tokeniser.stringify(xt.detach()[-1].argmax(-1)))
 
                 acc = self.accuracy(torch.einsum('ijk->ikj', xt), AA_seq.argmax(-1))
                 print(f"{time.ctime(time.time())} | epoch : {epoch} | loss : {str(l)} | acc : {str(acc )} | {round((time.time()-start)/60, 3)}mins") 

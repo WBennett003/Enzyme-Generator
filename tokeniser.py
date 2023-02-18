@@ -122,3 +122,19 @@ class Amino_Acid_Tokeniser():
                 t = self.tokenise(elem)
                 tokens.append(t)
         return tokens
+
+    def stringify(self, x):    
+        size = len(x)
+        tokens = []
+        if size == 2:
+            for batch in x:
+                b = []
+                for elem in batch:
+                    t = self.components[elem]
+                    b.append(t)
+                tokens.append(b)
+        else:
+            for elem in x:
+                t = self.components[elem]
+                tokens.append(t)
+        return tokens

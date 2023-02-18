@@ -11,7 +11,7 @@ def padding(seq, maxlength):
     return blank
 
 class parse_tsv:
-    def __init__(self, inp_file_dir, out_file_dir, max_seq_aa=1000, reaction_embed_size=256) -> None:
+    def __init__(self, inp_file_dir, out_file_dir, max_seq_aa=1000, reaction_embed_size=256, max=100) -> None:
         self.inp_file_dir = inp_file_dir
         self.out_file_dir = out_file_dir
         self.max_aa_seq = max_seq_aa
@@ -22,7 +22,7 @@ class parse_tsv:
 
         self.initalise_ds()
 
-        self.run()
+        self.run(max=100)
 
     def step_row(self, row):
         #clean row
@@ -38,9 +38,12 @@ class parse_tsv:
                 else:
                     pass
 
-    def run(self, step=10000):
-        with open(self.inp_file_dir, 'r') as f:
-            n = len(f.readlines())
+    def run(self, step=10000, max=None):
+        if max is None:
+            with open(self.inp_file_dir, 'r') as f:
+                n = len(f.readlines())
+        else:
+            n = max
 
         with open(self.inp_file_dir, 'r') as f:
             print(f"PROCESSING {n} SAMPLES!!!")
@@ -108,4 +111,4 @@ class parse_tsv:
         self.file[key][-1:] = arr
 
 if __name__ == '__main__':
-    p = parse_tsv('datasets/uniprot_tokenised_db.tsv', 'datasets/1M_sample_ds')
+    p = parse_tsv('datasets/uniprot_tokenised_db.tsv', 'datasets/mini_ds')

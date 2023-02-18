@@ -19,7 +19,37 @@ def train():
 
     params = {
         "EPOCHS" : 10,
-        "BATCH_SIZE" : 15,
+        "BATCH_SIZE" : 5,
+        "LEARN_RATE" : 1e-3,
+        "AA_SIZE" : len(aa_tokeniser),
+        "MAX_SEQUENCE_LENGTH" : 1000, #4th value in ds is AA_seq
+        "DMODEL" : 24,
+        "dff" : 256,
+        "N_STEPS" : 200,
+        "DROPOUT" : 0.01,
+        "N_HEADS" : 6,
+        "N_BLOCKS" : 6,
+        "CHEM_HASHSIZE" : 256
+    }
+    model = Transformer(params['MAX_SEQUENCE_LENGTH'], params['CHEM_HASHSIZE'], params['DROPOUT'], params['DMODEL'], params['dff'], params['N_HEADS'], params['N_BLOCKS'], params['AA_SIZE'])
+    # model = UNetModel(in_channels=params['AA_SIZE'], out_channels=params['AA_SIZE'], channels=params['CHANNELS'], n_res_blocks=params['N_RES_BLOCKS'], attention_levels=params['ATTN_LVLS'], channel_multipliers=params['CHANNEL_MULTIPLIERS'], n_heads=params['N_HEADS'], d_cond=params['CHEM_HASHSIZE'], device=device)
+    pytorch_total_params = sum(p.numel() for p in model.parameters()) 
+    print(pytorch_total_params)
+    model.to(device)
+
+    denoise = DenoiseDiffusion(model, params['N_STEPS'], device)
+    enzyme_generator = EnzymeGenerator(denoise, params['MAX_SEQUENCE_LENGTH'], aa_tokeniser, params['N_STEPS'], MODEL_PARAMS=params, WANDB=True, device=device)
+
+    enzyme_generator.train(ds, params['EPOCHS'], params['BATCH_SIZE'], params['LEARN_RATE'])
+
+def test():
+    aa_tokeniser = Amino_Acid_Tokeniser()
+    ds = dataset_h5(file_path='datasets/mini_ds.h5', device=device)
+
+
+    params = {
+        "EPOCHS" : 2,
+        "BATCH_SIZE" : 10,
         "LEARN_RATE" : 1e-3,
         "AA_SIZE" : len(aa_tokeniser),
         "MAX_SEQUENCE_LENGTH" : 1000, #4th value in ds is AA_seq
@@ -32,13 +62,14 @@ def train():
         "CHEM_HASHSIZE" : 256
     }
     model = Transformer(params['MAX_SEQUENCE_LENGTH'], params['CHEM_HASHSIZE'], params['DROPOUT'], params['DMODEL'], params['dff'], params['N_HEADS'], params['N_BLOCKS'], params['AA_SIZE'])
-    # model = UNetModel(in_channels=params['AA_SIZE'], out_channels=params['AA_SIZE'], channels=params['CHANNELS'], n_res_blocks=params['N_RES_BLOCKS'], attention_levels=params['ATTN_LVLS'], channel_multipliers=params['CHANNEL_MULTIPLIERS'], n_heads=params['N_HEADS'], d_cond=params['CHEM_HASHSIZE'], device=device)
+    pytorch_total_params = sum(p.numel() for p in model.parameters()) 
+    print(pytorch_total_params)
     model.to(device)
     denoise = DenoiseDiffusion(model, params['N_STEPS'], device)
-    enzyme_generator = EnzymeGenerator(denoise, params['MAX_SEQUENCE_LENGTH'], aa_tokeniser, params['N_STEPS'], MODEL_PARAMS=params, WANDB=True, device=device)
+    enzyme_generator = EnzymeGenerator(denoise, params['MAX_SEQUENCE_LENGTH'], aa_tokeniser, params['N_STEPS'], MODEL_PARAMS=params, WANDB=False, device=device)
 
     enzyme_generator.train(ds, params['EPOCHS'], params['BATCH_SIZE'], params['LEARN_RATE'])
 
-
 if __name__ == '__main__':
     train()
+    # test()
