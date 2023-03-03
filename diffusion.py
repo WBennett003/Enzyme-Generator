@@ -1,20 +1,38 @@
 import torch
 import torch.nn.functional as F
 import torch.utils.data
+import numpy as np
+import math
 
+
+import matplotlib.pyplot as plt
 
 def gather(consts: torch.Tensor, t: torch.Tensor):
     """Gather consts for $t$ and reshape to feature map shape"""
     c = consts.gather(-1, t)
     return c.reshape(-1, 1, 1)
-    
+
 class DenoiseDiffusion:
-    def __init__(self, model, n_steps, device):
+    def __init__(self, model, n_steps, device, s=0.008): #idk what s is really doing but smart paper says 0.008 is good :P
         super().__init__()
         self.model = model
-        self.beta = torch.linspace(0.0001, 0.02, n_steps).to(device)
-        self.alpha = 1. - self.beta
-        self.alpha_bar = torch.cumprod(self.alpha, dim=0)
+        x = np.linspace(0.0, n_steps, n_steps)
+        # self.alpha = 1. - self.beta
+        # self.alpha_bar = torch.cumprod(self.alpha, dim=0)
+        c1 = 1 + s
+        c2 = math.pi / 2
+        ft = np.cos(
+            ((x/n_steps + s) / c1)*c2 
+            ) ** 2
+        
+        alpha_bar = ft / ft[0]
+        self.alpha_bar = torch.tensor(alpha_bar)
+        # plt.plot(x/n_steps, self.alpha_bar)
+        # plt.show()
+        self.beta = 1 - (self.alpha_bar[1:] / self.alpha_bar[:-1])
+        self.beta = torch.tensor(np.insert(self.beta, 0, 0.0))#.to(device)
+        # plt.plot(x/n_steps, self.beta)
+        # plt.show()
         self.n_steps = n_steps
         self.sigma2 = self.beta
 
@@ -49,7 +67,7 @@ class DenoiseDiffusion:
         E = mean + (var ** .5) * eps
         return E
 
-    def loss(self, x0, cond, noise=None): #x0 is tuple of E, P, ADJ values
+    def loss(self, x0, cond, noise=None, mask=None, fwd=None): #x0 is tuple of E, P, ADJ values
         batch_size = x0.shape[0]
         t = torch.randint(0, self.n_steps, (batch_size,), device=x0.device, dtype=torch.long)
 
@@ -58,7 +76,7 @@ class DenoiseDiffusion:
 
         xt = self.q_sample(x0, t, noise)
             
-        eps_theta = self.model(xt, t, cond)
+        eps_theta = self.model(xt, mask, cond, t, fwd)
 
         loss = F.mse_loss(noise, eps_theta)
         return loss

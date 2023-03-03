@@ -31,7 +31,7 @@ class EnzymeGenerator: #TODO: to add wandb loging, saving and loading weights
 
         self.accuracy = Accuracy(task='multiclass', num_classes=self.AA_size).to(self.device)
         
-    def train(self, dataset, EPOCHS, BATCH_SIZE=5, learning_rate=1e-3, log=True, print_n=1 , name='enzyme', load=(False, False), visualiation=True):
+    def train(self, dataset, EPOCHS, BATCH_SIZE=5, learning_rate=1e-3, log=True, print_n=1 , name='enzyme', load=(False, False), visualiation=True, fwd=None):
         
         data_loader = torch.utils.data.DataLoader(dataset, BATCH_SIZE, shuffle=True, pin_memory=False, num_workers=0)
 
@@ -49,16 +49,19 @@ class EnzymeGenerator: #TODO: to add wandb loging, saving and loading weights
         start = time.time()
 
         for epoch in range(EPOCHS):
-            tot_loss = 0
             for AA_seq, eqx in data_loader:
+                
+                blank = torch.zeros((AA_seq.shape[0], 1280))
+                blank[:, :AA_seq.shape[1]] = AA_seq
+                AA_seq = blank
                 AA_seq = torch.where(AA_seq > 0, AA_seq, 0)
                 AA_seq = torch.nn.functional.one_hot(torch.round(AA_seq).long(), self.AA_size).float()
-                loss = self.denoise.loss(AA_seq, eqx[:, :, None])
+                mask = torch.ones((AA_seq.shape[0], 1280)).to(self.device)
+                loss = self.denoise.loss(AA_seq, eqx, mask=mask, fwd=fwd)
 
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                tot_loss += loss.detach().item()
 
             torch.save(self.denoise.model.state_dict(), self.save_dir+name+'model.pt')
             torch.save(optimizer.state_dict(), self.save_dir+name+'optimizer-adamW.pt')
@@ -66,8 +69,8 @@ class EnzymeGenerator: #TODO: to add wandb loging, saving and loading weights
             schedular.step()
 
             if epoch % print_n == 0:
-                l = tot_loss / n_batches
-                xt = self.inference(eqx[:, :, None].to(self.device), 2)
+                l = loss
+                xt = self.inference(eqx.to(self.device), 2)
                 true_seq = ''.join(self.aa_tokeniser.stringify(AA_seq.detach()[-1].argmax(-1)))
                 pred_seq = ''.join(self.aa_tokeniser.stringify(xt.detach()[-1].argmax(-1)))
 
